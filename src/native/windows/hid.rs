@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::ffi::c_void;
+use std::sync::Mutex;
 use std::{iter, mem};
 
 use once_cell::sync::Lazy;
@@ -99,7 +100,8 @@ pub(super) unsafe fn enumerate_wiimote_hid_devices<F>(mut callback: F) -> Result
 where
     F: FnMut(&DeviceInfo, &str),
 {
-    static mut UNRELATED_DEVICES: Lazy<HashSet<String>> = Lazy::new(HashSet::new);
+    static UNRELATED_DEVICES: Lazy<Mutex<HashSet<String>>> =
+        Lazy::new(|| Mutex::new(HashSet::new()));
 
     let hid_id = HidD_GetHidGuid();
 
@@ -135,7 +137,14 @@ where
         let device_path = &device_list[start_index..end_index];
         let device_path_string = from_wstring(device_path);
         start_index = end_index;
-        if UNRELATED_DEVICES.contains(&device_path_string) {
+        let should_skip = {
+            let unrelated_devices = match UNRELATED_DEVICES.lock() {
+                Ok(unrelated_devices) => unrelated_devices,
+                Err(unrelated_devices) => unrelated_devices.into_inner(),
+            };
+            unrelated_devices.contains(&device_path_string)
+        };
+        if should_skip {
             continue;
         }
 
@@ -143,7 +152,11 @@ where
             if is_wiimote(device_info.vendor_id(), device_info.product_id()) {
                 callback(&device_info, &device_path_string);
             } else {
-                UNRELATED_DEVICES.insert(device_path_string);
+                let mut unrelated_devices = match UNRELATED_DEVICES.lock() {
+                    Ok(unrelated_devices) => unrelated_devices,
+                    Err(unrelated_devices) => unrelated_devices.into_inner(),
+                };
+                unrelated_devices.insert(device_path_string);
             }
         }
     }

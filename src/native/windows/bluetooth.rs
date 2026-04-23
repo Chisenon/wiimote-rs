@@ -18,7 +18,7 @@ use super::from_wstring;
 
 const HUMAN_INTERFACE_DEVICE_SERVICE_CLASS_ID: u128 = 0x1124_0000_1000_8000_0080_5F9B_34FB;
 
-static mut CONNECTED_WIIMOTES: Lazy<Mutex<HashMap<String, BLUETOOTH_DEVICE_INFO>>> =
+static CONNECTED_WIIMOTES: Lazy<Mutex<HashMap<String, BLUETOOTH_DEVICE_INFO>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 unsafe fn enumerate_bluetooth_radios<F>(mut callback: F) -> Result<(), String>

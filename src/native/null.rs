@@ -1,12 +1,11 @@
 use super::NativeWiimote;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static WARNING_PRINTED: AtomicBool = AtomicBool::new(false);
 
 pub fn wiimotes_scan(_wiimotes: &mut Vec<NullNativeWiimote>) {
-    static mut WARNING_PRINTED: bool = false;
-    unsafe {
-        if !WARNING_PRINTED {
-            eprintln!("wiimote-rs does not support this platform. You will not be able to connect Wii remotes.");
-            WARNING_PRINTED = true;
-        }
+    if !WARNING_PRINTED.swap(true, Ordering::Relaxed) {
+        eprintln!("wiimote-rs does not support this platform. You will not be able to connect Wii remotes.");
     }
 }
 

@@ -20,7 +20,7 @@ use self::hid::{enumerate_wiimote_hid_devices, open_wiimote_device};
 
 use super::NativeWiimote;
 
-static mut WIIMOTES_HANDLED: Lazy<Mutex<HashSet<String>>> =
+static WIIMOTES_HANDLED: Lazy<Mutex<HashSet<String>>> =
     Lazy::new(|| Mutex::new(HashSet::new()));
 
 unsafe fn from_wstring(wstr: &[u16]) -> String {

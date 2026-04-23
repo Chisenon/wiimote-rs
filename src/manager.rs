@@ -20,9 +20,9 @@ pub struct WiimoteManager {
 impl WiimoteManager {
     /// Get the Wii remote manager instance.
     pub fn get_instance() -> Arc<Mutex<Self>> {
-        static mut SINGLETON: Lazy<Arc<Mutex<WiimoteManager>>> =
+        static SINGLETON: Lazy<Arc<Mutex<WiimoteManager>>> =
             Lazy::new(|| WiimoteManager::new_with_interval(Duration::from_millis(500)));
-        unsafe { SINGLETON.clone() }
+        SINGLETON.clone()
     }
 
     /// Cleanup the Wii remote manager instance and disconnect all Wii remotes.
