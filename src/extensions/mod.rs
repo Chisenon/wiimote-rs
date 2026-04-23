@@ -38,6 +38,15 @@ impl WiimoteExtension {
     }
 
     fn identify_extension(wiimote: &WiimoteDevice) -> WiimoteResult<Option<[u8; 6]>> {
+        fn optional_detect_error(error: &WiimoteError) -> bool {
+            matches!(
+                error,
+                WiimoteError::WiimoteDeviceError(
+                    WiimoteDeviceError::MissingData | WiimoteDeviceError::InvalidData
+                )
+            )
+        }
+
         // https://www.wiibrew.org/wiki/Wiimote/Extension_Controllers#Identification
         // The new way to initialize the extension is by writing 0x55 to 0x(4)A400F0, then writing 0x00 to 0x(4)A400FB.
         // Once initialized, the last six bytes of the register block identify the connected Extension Controller.
@@ -47,20 +56,32 @@ impl WiimoteExtension {
 
         memory_write_buffer[0] = 0x55;
         let addressing = Addressing::control_registers(0xA4_00F0, 1);
-        let ack = simple_io::write_16_bytes_sync(wiimote, addressing, &memory_write_buffer)?;
+        let ack = match simple_io::write_16_bytes_sync(wiimote, addressing, &memory_write_buffer) {
+            Ok(ack) => ack,
+            Err(error) if optional_detect_error(&error) => return Ok(None),
+            Err(error) => return Err(error),
+        };
         if ack.error_code() == 7 {
             return Ok(None);
         }
 
         memory_write_buffer[0] = 0x00;
         let addressing = Addressing::control_registers(0xA4_00FB, 1);
-        let ack = simple_io::write_16_bytes_sync(wiimote, addressing, &memory_write_buffer)?;
+        let ack = match simple_io::write_16_bytes_sync(wiimote, addressing, &memory_write_buffer) {
+            Ok(ack) => ack,
+            Err(error) if optional_detect_error(&error) => return Ok(None),
+            Err(error) => return Err(error),
+        };
         if ack.error_code() == 7 {
             return Ok(None);
         }
 
         let addressing = Addressing::control_registers(0xA4_00FA, 6);
-        let read_result = simple_io::read_16_bytes_sync(wiimote, addressing)?;
+        let read_result = match simple_io::read_16_bytes_sync(wiimote, addressing) {
+            Ok(read_result) => read_result,
+            Err(error) if optional_detect_error(&error) => return Ok(None),
+            Err(error) => return Err(error),
+        };
         // Address is actually 0xA4_00FA, but only the lower 2 bytes are returned
         if read_result.address_offset() != 0x00FA || read_result.size() < 6 {
             Err(WiimoteDeviceError::InvalidData.into())

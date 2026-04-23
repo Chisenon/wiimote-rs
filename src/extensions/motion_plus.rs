@@ -154,11 +154,35 @@ impl MotionPlus {
     ///
     /// This function will return an error if communication to the Wii remote failed.
     pub(crate) fn detect(wiimote: &WiimoteDevice) -> WiimoteResult<Option<Self>> {
+        fn optional_detect_error(error: &WiimoteError) -> bool {
+            matches!(
+                error,
+                WiimoteError::WiimoteDeviceError(
+                    WiimoteDeviceError::MissingData | WiimoteDeviceError::InvalidData
+                )
+            )
+        }
+
+        let init_address = Addressing::control_registers(0xA6_00F0, 1);
+        let init_buffer = [0u8; 16];
+
+        if let Ok(ack) = simple_io::write_16_bytes_sync(wiimote, init_address, &init_buffer) {
+            if ack.error_code() == 7 {
+                return Ok(None);
+            }
+        }
+
         let address = Addressing::control_registers(0xA6_00FA, 6);
-        let memory_data = simple_io::read_16_bytes_sync(wiimote, address)?;
+        let memory_data = match simple_io::read_16_bytes_sync(wiimote, address) {
+            Ok(memory_data) => memory_data,
+            Err(error) if optional_detect_error(&error) => return Ok(None),
+            Err(error) => return Err(error),
+        };
         let motion_plus_type = match memory_data.data[0..6] {
             [0x00, 0x00, 0xA6, 0x20, _, 0x05] => MotionPlusType::External,
             [_, 0x00, 0xA6, 0x20, _, 0x05] => MotionPlusType::Builtin,
+            [_, _, 0xA4, 0x20, 0x00, 0x05] => MotionPlusType::External,
+            [_, _, 0xA4, 0x20, _, 0x05] => MotionPlusType::Builtin,
             _ => return Ok(None),
         };
 
